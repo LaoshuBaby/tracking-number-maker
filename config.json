@@ -1,25 +1,30 @@
 {
+    // 标签基础参数
     "label": {
-        "width": 50,
-        "height": 30,
-        "corner_radius": 3,
-        "bleed": 2,
-        "padding": 5
+        "width": 50,        // 标签宽度(mm)
+        "height": 30,       // 标签高度(mm) 
+        "corner_radius": 3, // 圆角半径(mm)
+        "bleed": 2,         // 出血宽度(mm)
+        "padding": 5        // 内容边距(mm)
     },
+    
+    // 纸张参数
     "paper": {
-        "width": 210,
-        "height": 297,
-        "margin": 5,
-        "spacing": 2
+        "width": 210,      // 纸张宽度(mm)
+        "height": 297,     // 纸张高度(mm)
+        "margin": 5,       // 纸张边距(mm)
+        "gap": 2           // 标签间距(mm)
     },
+    
+    // 其他参数
     "font": {
-        "size": 20,
+        "size": 4,         // 字体大小(mm)
         "path": "NotoSansCJK-Regular.ttc"
     },
     "qr": {
-        "size": 15,
-        "padding": 3
+        "size": 15,        // 二维码尺寸(mm)
+        "padding": 3       // 二维码边距(mm)
     },
-    "output_dpi": 300,
-    "unit": "mm"
+    "dpi": 300,           // 输出分辨率
+    "unit": "mm"          // 单位系统
 }
