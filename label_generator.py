@@ -18,9 +18,10 @@ class LabelGenerator:
         """毫米转像素"""
         return int(mm * self.mm_to_px)
 
-    def create_single_label(self, text="明信片"):
+    def create_single_label(self, text="明信片", qr_data=None):
         """创建单个标签
         :param text: 标签文字内容
+        :param qr_data: 二维码数据(为空则不生成)
         :return: PIL.Image对象
         """
         img = Image.new('L', (self.mm_to_pixels(self.width), 
@@ -33,6 +34,19 @@ class LabelGenerator:
         except:
             font = ImageFont.load_default()
         draw.text((10, 10), text, font=font, fill=0)
+        
+        # 添加二维码
+        if qr_data:
+            qr = qrcode.QRCode(
+                version=1,
+                box_size=3,
+                border=2
+            )
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            qr_img = qr_img.resize((self.mm_to_pixels(15), self.mm_to_pixels(15)))
+            img.paste(qr_img, (self.mm_to_pixels(self.width)-self.mm_to_pixels(18), 10))
         
         return img
 
@@ -59,10 +73,17 @@ class LabelGenerator:
 if __name__ == "__main__":
     generator = LabelGenerator(width=50, height=30, dpi=300)
     
-    # 生成单标签
-    label = generator.create_single_label("明信片")
-    label.save("single_label.png")
+    # 生成带二维码的单标签
+    label_with_qr = generator.create_single_label(
+        text="明信片",
+        qr_data="TRACK123456789"
+    )
+    label_with_qr.save("label_with_qr.png")
     
-    # 生成A4标签页
-    a4_sheet = generator.create_a4_sheet(cols=4, rows=8, text="明信片")
-    a4_sheet.save("a4_sheet.png")
+    # 生成带二维码的A4标签页
+    a4_sheet_with_qr = generator.create_a4_sheet(
+        cols=4, 
+        rows=8, 
+        text="明信片"
+    )
+    a4_sheet_with_qr.save("a4_sheet_with_qr.png")
