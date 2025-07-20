@@ -1,0 +1,23 @@
+
+{
+    "label": {
+        "width": 50,
+        "height": 30,
+        "corner_radius": 3,
+        "bleed": 2,
+        "padding": 5
+    },
+    "a4": {
+        "cols": 4,
+        "rows": 8,
+        "spacing": 5
+    },
+    "font": {
+        "size": 20,
+        "path": "NotoSansCJK-Regular.ttc"
+    },
+    "qr": {
+        "size": 15,
+        "padding": 3
+    }
+}

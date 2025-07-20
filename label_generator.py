@@ -1,42 +1,73 @@
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
+import json
+import os
 
 class LabelGenerator:
-    def __init__(self, width=100, height=50, dpi=300):
+    def __init__(self, config_file="config.json"):
         """初始化标签生成器
-        :param width: 标签宽度(mm)
-        :param height: 标签高度(mm) 
-        :param dpi: 输出分辨率
+        :param config_file: 配置文件路径
         """
-        self.width = width
-        self.height = height
-        self.dpi = dpi
-        self.mm_to_px = dpi / 25.4  # 毫米转像素系数
+        with open(config_file) as f:
+            self.config = json.load(f)
+        
+        # 设置默认DPI
+        self.dpi = 300
+        self.mm_to_px = self.dpi / 25.4
+        
+        # 确保dist目录存在
+        os.makedirs("dist", exist_ok=True)
+
+    def load_font(self):
+        """加载字体"""
+        try:
+            return ImageFont.truetype(
+                self.config["font"]["path"],
+                self.config["font"]["size"]
+            )
+        except:
+            return ImageFont.load_default()
 
     def mm_to_pixels(self, mm):
         """毫米转像素"""
         return int(mm * self.mm_to_px)
 
     def create_single_label(self, text="明信片", qr_data=None):
-        """创建单个标签
+        """创建带框线和出血线的标签
         :param text: 标签文字内容
-        :param qr_data: 二维码数据(为空则不生成)
+        :param qr_data: 二维码数据
         :return: PIL.Image对象
         """
-        img = Image.new('L', (self.mm_to_pixels(self.width), 
-                            self.mm_to_pixels(self.height)), 255)
+        cfg = self.config["label"]
+        bleed_px = self.mm_to_pixels(cfg["bleed"])
+        width_px = self.mm_to_pixels(cfg["width"] + cfg["bleed"]*2)
+        height_px = self.mm_to_pixels(cfg["height"] + cfg["bleed"]*2)
+        
+        # 创建带出血的画布
+        img = Image.new('L', (width_px, height_px), 255)
         draw = ImageDraw.Draw(img)
         
+        # 绘制标签框线(带圆角)
+        box = [
+            bleed_px, bleed_px,
+            width_px - bleed_px,
+            height_px - bleed_px
+        ]
+        radius = self.mm_to_pixels(cfg["corner_radius"])
+        self._draw_rounded_rectangle(draw, box, radius)
+        
         # 添加文字
-        try:
-            font = ImageFont.truetype("NotoSansCJK-Regular.ttc", 20)
-        except:
-            font = ImageFont.load_default()
-        draw.text((10, 10), text, font=font, fill=0)
+        font = self.load_font()
+        text_x = bleed_px + self.mm_to_pixels(cfg["padding"])
+        text_y = bleed_px + self.mm_to_pixels(cfg["padding"])
+        draw.text((text_x, text_y), text, font=font, fill=0)
         
         # 添加二维码
         if qr_data:
+            qr_size = self.mm_to_pixels(self.config["qr"]["size"])
+            qr_padding = self.mm_to_pixels(self.config["qr"]["padding"])
+            
             qr = qrcode.QRCode(
                 version=1,
                 box_size=3,
@@ -45,45 +76,81 @@ class LabelGenerator:
             qr.add_data(qr_data)
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color="black", back_color="white")
-            qr_img = qr_img.resize((self.mm_to_pixels(15), self.mm_to_pixels(15)))
-            img.paste(qr_img, (self.mm_to_pixels(self.width)-self.mm_to_pixels(18), 10))
+            qr_img = qr_img.resize((qr_size, qr_size))
+            
+            qr_x = width_px - bleed_px - qr_size - qr_padding
+            qr_y = bleed_px + qr_padding
+            img.paste(qr_img, (qr_x, qr_y))
         
         return img
 
-    def create_a4_sheet(self, cols=4, rows=8, text="明信片"):
-        """创建A4纸大小的标签页
-        :param cols: 每行标签数
-        :param rows: 每列标签数
+    def _draw_rounded_rectangle(self, draw, box, radius):
+        """绘制圆角矩形"""
+        # 绘制四个角的圆弧
+        draw.arc([box[0], box[1], box[0]+radius*2, box[1]+radius*2], 180, 270, 0)
+        draw.arc([box[2]-radius*2, box[1], box[2], box[1]+radius*2], 270, 360, 0)
+        draw.arc([box[2]-radius*2, box[3]-radius*2, box[2], box[3]], 0, 90, 0)
+        draw.arc([box[0], box[3]-radius*2, box[0]+radius*2, box[3]], 90, 180, 0)
+        
+        # 绘制四条边
+        draw.line([(box[0]+radius, box[1]), (box[2]-radius, box[1])], 0)
+        draw.line([(box[2], box[1]+radius), (box[2], box[3]-radius)], 0)
+        draw.line([(box[0]+radius, box[3]), (box[2]-radius, box[3])], 0)
+        draw.line([(box[0], box[1]+radius), (box[0], box[3]-radius)], 0)
+
+    def create_a4_sheet(self, text="明信片", qr_data=None):
+        """创建带出血和间距的A4标签页
+        :param text: 标签文字内容
+        :param qr_data: 二维码数据模板(会自动添加序号)
         :return: PIL.Image对象
         """
-        a4_width = 210  # A4宽度(mm)
-        a4_height = 297  # A4高度(mm)
-        sheet = Image.new('L', (self.mm_to_pixels(a4_width),
-                              self.mm_to_pixels(a4_height)), 255)
+        cfg = self.config
+        a4_cfg = cfg["a4"]
+        label_cfg = cfg["label"]
         
-        for row in range(rows):
-            for col in range(cols):
-                label = self.create_single_label(text)
-                x = col * self.mm_to_pixels(self.width)
-                y = row * self.mm_to_pixels(self.height)
-                sheet.paste(label, (x, y))
+        # A4实际尺寸(含出血)
+        a4_width = 210 + label_cfg["bleed"]*2
+        a4_height = 297 + label_cfg["bleed"]*2
+        sheet = Image.new('L', 
+                        (self.mm_to_pixels(a4_width),
+                        (self.mm_to_pixels(a4_height))), 
+                        255)
+        draw = ImageDraw.Draw(sheet)
+        
+        # 计算标签间距和偏移量
+        spacing_px = self.mm_to_pixels(a4_cfg["spacing"])
+        label_width = self.mm_to_pixels(label_cfg["width"] + label_cfg["bleed"]*2)
+        label_height = self.mm_to_pixels(label_cfg["height"] + label_cfg["bleed"]*2)
+        
+        # 交错排列标签
+        for row in range(a4_cfg["rows"]):
+            for col in range(a4_cfg["cols"]):
+                # 计算位置(带随机偏移)
+                x = label_cfg["bleed"] + col * (label_width + spacing_px)
+                y = label_cfg["bleed"] + row * (label_height + spacing_px)
+                
+                # 生成带序号的二维码数据
+                current_qr = f"{qr_data}-{row*a4_cfg['cols']+col+1}" if qr_data else None
+                label = self.create_single_label(text, current_qr)
+                sheet.paste(label, (int(x), int(y)))
         
         return sheet
 
 if __name__ == "__main__":
-    generator = LabelGenerator(width=50, height=30, dpi=300)
+    generator = LabelGenerator()
     
     # 生成带二维码的单标签
     label_with_qr = generator.create_single_label(
         text="明信片",
         qr_data="TRACK123456789"
     )
-    label_with_qr.save("label_with_qr.png")
+    label_with_qr.save("dist/label_with_qr.png")
     
-    # 生成带二维码的A4标签页
+    # 生成带序号的A4标签页
     a4_sheet_with_qr = generator.create_a4_sheet(
-        cols=4, 
-        rows=8, 
-        text="明信片"
+        text="明信片",
+        qr_data="TRACK"
     )
-    a4_sheet_with_qr.save("a4_sheet_with_qr.png")
+    a4_sheet_with_qr.save("dist/a4_sheet_with_qr.png")
+    
+    print("标签生成完成，文件已保存到dist目录")
