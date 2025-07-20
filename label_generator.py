@@ -1,8 +1,12 @@
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
+import barcode
+from barcode.writer import ImageWriter
 import json
 import os
 import math
+import random
+import io
 
 class LabelGenerator:
     def __init__(self, config_file="config.json"):
@@ -20,16 +24,25 @@ class LabelGenerator:
         """将毫米转换为像素"""
         return int(mm * self.scale * self.mm_to_px)
 
-    def create_label(self, text="明信片", qr_data=None):
+    def create_label(self, text="明信片条码", qr_data=None, tracking_number=None):
         """生成单个标签
         
         Args:
             text: 标签上显示的文字
             qr_data: 二维码数据，如果为None则不生成二维码
+            tracking_number: 跟踪号，如果为None则随机生成
             
         Returns:
             PIL.Image: 生成的标签图像
         """
+        # 如果没有提供跟踪号，则生成一个随机跟踪号
+        if tracking_number is None:
+            tracking_number = f"TN{random.randint(10000000, 99999999)}"
+        
+        # 如果没有提供二维码数据，则使用跟踪号
+        if qr_data is None:
+            qr_data = tracking_number
+            
         # 计算画布尺寸（含出血）
         width = self.mm_to_pixels(
             self.cfg["label.width"] + 2*self.cfg["label.bleed"]
@@ -50,17 +63,64 @@ class LabelGenerator:
         ]
         self._draw_rounded_rect(draw, box, self.cfg["label.corner_radius"])
         
-        # 添加文字
+        # 加载字体
         font = self._load_font()
+        small_font = self._load_font(size_factor=0.8)
+        
+        # 添加标题文字
         text_x = bleed_px + self.mm_to_pixels(self.cfg["label.padding"])
         text_y = bleed_px + self.mm_to_pixels(self.cfg["label.padding"])
         draw.text((text_x, text_y), text, font=font, fill=0)
         
-        # 添加二维码（如有）
-        if qr_data:
-            self._add_qr_code(img, qr_data)
+        # 添加跟踪号
+        tracking_y = text_y + self.mm_to_pixels(self.cfg["font.size"] * 1.5)
+        draw.text((text_x, tracking_y), f"编号: {tracking_number}", font=small_font, fill=0)
+        
+        # 添加二维码
+        self._add_qr_code(img, qr_data)
+        
+        # 添加条形码
+        self._add_barcode(img, tracking_number)
         
         return img
+        
+    def _add_barcode(self, img, data):
+        """添加条形码到标签"""
+        # 确保数据符合条形码要求（只包含数字）
+        if not isinstance(data, str):
+            data = str(data)
+        
+        # 如果数据包含非数字字符，则只保留数字
+        numeric_data = ''.join(filter(str.isdigit, data))
+        if len(numeric_data) < 8:  # 确保至少有8位数字
+            numeric_data = numeric_data.zfill(8)
+        
+        # 生成条形码
+        barcode_class = barcode.get_barcode_class('code128')
+        barcode_writer = ImageWriter()
+        barcode_writer.dpi = self.cfg["dpi"]
+        
+        # 设置条形码尺寸
+        barcode_width = self.mm_to_pixels(self.cfg["label.width"] * 0.8)
+        barcode_height = self.mm_to_pixels(10)  # 10mm高度
+        
+        # 生成条形码图像
+        barcode_obj = barcode_class(data, writer=barcode_writer)
+        barcode_bytes = io.BytesIO()
+        barcode_obj.write(barcode_bytes)
+        barcode_img = Image.open(barcode_bytes)
+        
+        # 调整条形码尺寸
+        barcode_img = barcode_img.resize((barcode_width, barcode_height))
+        
+        # 定位条形码（放在标签底部）
+        bleed_px = self.mm_to_pixels(self.cfg["label.bleed"])
+        padding_px = self.mm_to_pixels(self.cfg["label.padding"])
+        x = bleed_px + padding_px
+        y = img.height - bleed_px - padding_px - barcode_height
+        
+        # 粘贴条形码
+        img.paste(barcode_img, (x, y))
 
     def calculate_layout(self):
         """计算纸张上可以放置的标签数量和排列
@@ -68,9 +128,9 @@ class LabelGenerator:
         Returns:
             tuple: (列数, 行数) - 纸张上可以放置的标签列数和行数
         """
-        # 计算标签实际尺寸（含间隙）
-        label_width = self.cfg["label.width"] + self.cfg["paper.gap"]
-        label_height = self.cfg["label.height"] + self.cfg["paper.gap"]
+        # 计算标签实际尺寸（含出血和间隙）
+        label_width = self.cfg["label.width"] + 2 * self.cfg["label.bleed"] + self.cfg["paper.gap"]
+        label_height = self.cfg["label.height"] + 2 * self.cfg["label.bleed"] + self.cfg["paper.gap"]
         
         # 计算可用区域
         available_width = self.cfg["paper.width"] - 2 * self.cfg["paper.margin"]
@@ -82,7 +142,7 @@ class LabelGenerator:
         
         return (cols, rows)
 
-    def generate_sheet(self, labels=None, text="明信片", qr_data=None, qr_prefix=None):
+    def generate_sheet(self, labels=None, text="明信片条码", qr_data=None, qr_prefix=None):
         """生成整张标签页
         
         Args:
@@ -102,14 +162,19 @@ class LabelGenerator:
         if labels is None:
             labels = []
             for i in range(total_labels):
+                # 生成跟踪号
+                tracking_number = f"TN{random.randint(10000000, 99999999)}"
+                
                 # 如果提供了二维码前缀，则为每个标签生成序号化的二维码
                 current_qr = None
                 if qr_prefix:
                     current_qr = f"{qr_prefix}-{i+1}"
                 elif qr_data:
                     current_qr = qr_data
+                else:
+                    current_qr = tracking_number
                 
-                labels.append(self.create_label(text, current_qr))
+                labels.append(self.create_label(text, current_qr, tracking_number))
         
         # 创建画布
         sheet = Image.new(
@@ -129,9 +194,12 @@ class LabelGenerator:
             x = i % cols
             y = i // cols
             
-            # 计算标签位置
-            pos_x = self.mm_to_pixels(self.cfg["paper.margin"] + x * (self.cfg["label.width"] + self.cfg["paper.gap"]))
-            pos_y = self.mm_to_pixels(self.cfg["paper.margin"] + y * (self.cfg["label.height"] + self.cfg["paper.gap"]))
+            # 计算标签位置（考虑出血和间隙）
+            label_width_with_bleed = self.cfg["label.width"] + 2 * self.cfg["label.bleed"]
+            label_height_with_bleed = self.cfg["label.height"] + 2 * self.cfg["label.bleed"]
+            
+            pos_x = self.mm_to_pixels(self.cfg["paper.margin"] + x * (label_width_with_bleed + self.cfg["paper.gap"]))
+            pos_y = self.mm_to_pixels(self.cfg["paper.margin"] + y * (label_height_with_bleed + self.cfg["paper.gap"]))
             
             sheet.paste(label, (pos_x, pos_y))
         
@@ -167,12 +235,19 @@ class LabelGenerator:
         draw.line([(box[0]+radius, box[3]), (box[2]-radius, box[3])], 0)
         draw.line([(box[0], box[1]+radius), (box[0], box[3]-radius)], 0)
         
-    def _load_font(self):
-        """加载字体"""
+    def _load_font(self, size_factor=1.0):
+        """加载字体
+        
+        Args:
+            size_factor: 字体大小的缩放因子
+            
+        Returns:
+            PIL.ImageFont: 字体对象
+        """
         try:
             return ImageFont.truetype(
                 self.cfg["font.path"],
-                self.mm_to_pixels(self.cfg["font.size"])
+                int(self.mm_to_pixels(self.cfg["font.size"]) * size_factor)
             )
         except:
             return ImageFont.load_default()

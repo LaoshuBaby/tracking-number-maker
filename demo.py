@@ -23,7 +23,7 @@ def main():
     
     # 生成标签页
     # Generate label sheet
-    sheet_a4 = generator_a4.generate_sheet(text="明信片", qr_prefix="TRACK-A4")
+    sheet_a4 = generator_a4.generate_sheet(text="明信片条码", qr_prefix="TRACK-A4")
     sheet_a4.save("dist/a4_sheet.png")
     print(f"A4标签页已保存到 | A4 sheet saved to: dist/a4_sheet.png")
     
@@ -38,7 +38,7 @@ def main():
     
     # 生成标签页
     # Generate label sheet
-    sheet_b5 = generator_b5.generate_sheet(text="明信片", qr_prefix="TRACK-B5")
+    sheet_b5 = generator_b5.generate_sheet(text="明信片条码", qr_prefix="TRACK-B5")
     sheet_b5.save("dist/b5_sheet.png")
     print(f"B5标签页已保存到 | B5 sheet saved to: dist/b5_sheet.png")
     
@@ -49,11 +49,20 @@ def main():
     print(f"纸张尺寸 | Paper size: {generator_small.cfg['paper.width']}mm x {generator_small.cfg['paper.height']}mm")
     print(f"标签尺寸 | Label size: {generator_small.cfg['label.width']}mm x {generator_small.cfg['label.height']}mm")
     
-    # 生成单个标签
-    # Generate single label
-    label_small = generator_small.create_label("明信片", "TRACK-S-001")
+    # 生成单个标签（使用固定的跟踪号）
+    # Generate single label (with fixed tracking number)
+    tracking_number = "TN12345678"
+    label_small = generator_small.create_label("明信片条码", tracking_number=tracking_number)
     label_small.save("dist/single_label.png")
     print(f"单个标签已保存到 | Single label saved to: dist/single_label.png")
+    print(f"跟踪号 | Tracking number: {tracking_number}")
+    
+    # 生成带自定义二维码数据的标签
+    # Generate label with custom QR code data
+    custom_qr = "https://example.com/track?id=12345"
+    label_custom = generator_small.create_label("明信片条码", qr_data=custom_qr, tracking_number="TN87654321")
+    label_custom.save("dist/custom_qr_label.png")
+    print(f"自定义二维码标签已保存到 | Custom QR label saved to: dist/custom_qr_label.png")
     
     print("\n所有标签和标签页已生成到dist目录 | All labels and sheets have been generated to the dist directory")
 
