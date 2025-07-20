@@ -178,26 +178,5 @@ class LabelGenerator:
             return ImageFont.load_default()
 
 if __name__ == "__main__":
-    generator = LabelGenerator()
-    
-    # 计算并显示标签布局信息
-    cols, rows = generator.calculate_layout()
-    print(f"纸张尺寸: {generator.cfg['paper.width']}mm x {generator.cfg['paper.height']}mm")
-    print(f"标签尺寸: {generator.cfg['label.width']}mm x {generator.cfg['label.height']}mm")
-    print(f"每页可放置标签: {cols} 列 x {rows} 行 = {cols * rows} 个")
-    
-    # 生成单个测试标签
-    label = generator.create_label("测试标签", "https://example.com")
-    label.save("dist/single_label.png")
-    print(f"单个标签已保存到 dist/single_label.png")
-    
-    # 生成测试标签页（自动生成标签）
-    sheet = generator.generate_sheet(text="明信片", qr_prefix="TRACK")
-    sheet.save("dist/label_sheet.png")
-    print(f"标签页已保存到 dist/label_sheet.png")
-    
-    # 生成自定义标签页（手动提供标签）
-    custom_labels = [generator.create_label(f"标签{i}") for i in range(1, 9)]
-    custom_sheet = generator.generate_sheet(labels=custom_labels)
-    custom_sheet.save("dist/custom_label_sheet.png")
-    print(f"自定义标签页已保存到 dist/custom_label_sheet.png")
+    print("请运行 demo.py 来查看示例 | Please run demo.py to see examples")
+    print("python demo.py")

@@ -1,0 +1,21 @@
+{
+    "label.width": 30,
+    "label.height": 20,
+    "label.corner_radius": 2,
+    "label.bleed": 1,
+    "label.padding": 3,
+    
+    "paper.width": 40,
+    "paper.height": 60,
+    "paper.margin": 3,
+    "paper.gap": 1,
+    
+    "font.size": 3,
+    "font.path": "NotoSansCJK-Regular.ttc",
+    
+    "qr.size": 10,
+    "qr.padding": 2,
+    
+    "dpi": 300,
+    "unit": "mm"
+}
