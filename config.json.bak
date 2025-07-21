@@ -1,0 +1,19 @@
+
+{
+    "label_width": 50,
+    "label_height": 30,
+    "corner_radius": 3,
+    "bleed_width": 2,
+    "text_padding": 5,
+    "cols_per_a4": 4,
+    "rows_per_a4": 8,
+    "label_spacing": 5,
+    "font_size": 20,
+    "font_path": "NotoSansCJK-Regular.ttc",
+    "qr_size": 15,
+    "qr_padding": 3,
+    "output_dpi": 300,
+    "paper_width": 210,
+    "paper_height": 297,
+    "unit": "mm"
+}
